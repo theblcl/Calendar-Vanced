@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- This menu file is now mostly empty because we create the menu programmatically -->
+    <!-- in MainActivity.setupViewNavigation() and setupCalendarCheckboxes() -->
+
+    <!-- We only need to define the IDs that MainActivity references -->
+    <!-- The actual menu items are created dynamically -->
+
+</menu>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Main app theme - automatically switches between light/dark -->
+    <style name="Theme.CalendarApp" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/blue_500</item>
+        <item name="colorSecondary">@color/orange_500</item>
+    </style>
+
+    <!-- E-paper theme - high contrast, always light -->
+    <style name="Theme.CalendarApp.EPaper" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">#000000</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#000000</item>
+        <item name="colorSurface">#FFFFFF</item>
+        <item name="colorOnSurface">#000000</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+
+</resources>

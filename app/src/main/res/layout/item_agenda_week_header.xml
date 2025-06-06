@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="?android:attr/colorBackground"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="8dp"
+    android:gravity="center_vertical">
+
+    <View
+        android:layout_width="4dp"
+        android:layout_height="16dp"
+        android:background="?attr/colorOnSurfaceVariant"
+        android:layout_marginEnd="12dp" />
+
+    <TextView
+        android:id="@+id/text_week_range"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Jun 1 - 7"
+        android:textSize="14sp"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:fontFamily="sans-serif-medium" />
+
+</LinearLayout>

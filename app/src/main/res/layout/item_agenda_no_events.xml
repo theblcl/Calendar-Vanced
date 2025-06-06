@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:gravity="center">
+
+    <ImageView
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:src="@drawable/ic_calendar_empty"
+        android:alpha="0.3"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:id="@+id/text_no_events"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="No events this month"
+        android:textSize="14sp"
+        android:textColor="#9E9E9E"
+        android:gravity="center" />
+
+</LinearLayout>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Dark theme variant -->
+    <style name="Theme.CalendarApp" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/blue_500</item>
+        <item name="colorSecondary">@color/orange_500</item>
+    </style>
+
+</resources>

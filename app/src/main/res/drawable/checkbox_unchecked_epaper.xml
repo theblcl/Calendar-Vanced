@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Very thick black border -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M20,2H4C2.9,2 2,2.9 2,4v16c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V4C22,2.9 21.1,2 20,2z"/>
+
+    <!-- Large white inner area -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M19,3H5C4.4,3 4,3.4 4,4v16c0,0.6 0.4,1 1,1h14c0.6,0 1,-0.4 1,-1V4C20,3.4 19.6,3 19,3z"/>
+
+</vector>
