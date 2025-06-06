@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 class CalendarViewModel(private val context: Context) : ViewModel() {
-    private val repository = AndroidCalendarRepository(context)
+    private val repository = AndroidCalendarRepository(context)  // Changed to Android-only
 
     private val _events = MutableLiveData<List<CalendarEvent>>()
     val events: LiveData<List<CalendarEvent>> = _events
@@ -109,7 +109,7 @@ class CalendarViewModel(private val context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 _syncStatus.value = "Syncing with Android Calendar..."
-                repository.syncWithCalDAV()
+                repository.syncWithCalDAV() // This just does nothing for Android provider
                 loadEvents()
                 _syncStatus.value = "Sync completed"
             } catch (e: Exception) {
