@@ -75,6 +75,13 @@ class AndroidEventDetailFragment : DialogFragment() {
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentEventDetailBinding.inflate(inflater, container, false)
+
+        // Make the dialog full screen
+        dialog?.window?.setLayout(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
+
         return binding.root
     }
 
@@ -92,11 +99,14 @@ class AndroidEventDetailFragment : DialogFragment() {
     }
 
     private fun setupUI() {
-        // Make dialog full screen on smaller devices
+        // Make dialog full screen
         dialog?.window?.setLayout(
             ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
+            ViewGroup.LayoutParams.MATCH_PARENT
         )
+
+        // Remove dialog window background and decorations for true full screen
+        dialog?.window?.setBackgroundDrawableResource(android.R.color.transparent)
     }
 
     private fun setupTimezoneDropdown() {
@@ -241,7 +251,8 @@ class AndroidEventDetailFragment : DialogFragment() {
     }
 
     private fun setupClickListeners() {
-        binding.buttonCancel.setOnClickListener {
+        // Close button (X)
+        binding.buttonClose.setOnClickListener {
             dismiss()
         }
 
