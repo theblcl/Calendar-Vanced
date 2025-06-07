@@ -314,7 +314,6 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private fun setupCalendarCheckboxes(calendars: List<com.example.calendarapp.data.CalendarInfo>) {
         val currentTime = System.currentTimeMillis()
 
-        // Prevent duplicate calls within 1 second with same calendar count
         if (currentTime - lastCalendarSetupTime < 1000 && calendars.size == lastCalendarCount) {
             println("=== SKIPPING: setupCalendarCheckboxes called too soon (${currentTime - lastCalendarSetupTime}ms ago)")
             return
@@ -345,7 +344,6 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             return
         }
 
-        // Group calendars by their source
         val groupedCalendars = calendars.groupBy { calendar ->
             extractCalendarSource(calendar)
         }
@@ -354,14 +352,13 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         groupedCalendars.forEach { (source, cals) ->
             println("Group '$source': ${cals.size} calendars")
             cals.forEach { cal ->
-                println("  - ${cal.displayName}")
+                println("  - ${cal.displayName} (color: ${cal.color})")
             }
         }
 
         var itemIndex = 0
         var orderIndex = 50
 
-        // Add each group with its heading
         groupedCalendars.forEach { (source, calendarGroup) ->
             // Add group header
             val headerId = 999 - itemIndex
@@ -369,7 +366,8 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             headerItem.isEnabled = false
             println("Added group header: '$source' (ID: $headerId)")
 
-            // Add calendars in this group
+            // Add calendars in this group with colored text
+            // Add calendars in this group with colored text matching event accent bars
             calendarGroup.forEach { calendar ->
                 val menuItem = menu.add(
                     Menu.NONE,
@@ -381,6 +379,21 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                 menuItem.apply {
                     isCheckable = true
                     isChecked = viewModel.isCalendarVisible(calendar.displayName)
+
+                    // Create colored text span using THE EXACT SAME COLOR as event accent bars
+                    val spannable = android.text.SpannableString("  ${calendar.displayName}")
+                    try {
+                        // This MUST be the same color that appears in event.calendarColor
+                        val color = android.graphics.Color.parseColor(calendar.color)
+                        val colorSpan = android.text.style.ForegroundColorSpan(color)
+                        spannable.setSpan(colorSpan, 0, spannable.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        title = spannable
+
+                        println("Navigation menu: '${calendar.displayName}' using color: ${calendar.color}")
+                    } catch (e: Exception) {
+                        println("❌ Failed to parse color '${calendar.color}' for calendar '${calendar.displayName}'")
+                        title = "  ${calendar.displayName}"
+                    }
 
                     if (isChecked) {
                         setIcon(R.drawable.checkbox_checked_epaper)

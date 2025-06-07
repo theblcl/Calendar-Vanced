@@ -23,6 +23,6 @@
         android:text="Jun 1 - 7"
         android:textSize="14sp"
         android:textColor="?attr/colorOnSurfaceVariant"
-        android:fontFamily="sans-serif-medium" />
+        android:fontFamily="@font/inter_medium" />    <!-- Add this -->
 
 </LinearLayout>

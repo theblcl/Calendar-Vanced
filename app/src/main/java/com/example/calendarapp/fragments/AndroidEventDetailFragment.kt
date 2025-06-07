@@ -33,6 +33,31 @@ class AndroidEventDetailFragment : DialogFragment() {
     private var isAllDay = false
     private var availableCalendars = listOf<CalendarInfo>()
     private var selectedCalendar: CalendarInfo? = null
+    private var selectedTimeZone: TimeZone = TimeZone.getDefault()
+
+    private val availableTimeZones = listOf(
+        TimeZone.getTimeZone("America/New_York"),
+        TimeZone.getTimeZone("America/Chicago"),
+        TimeZone.getTimeZone("America/Denver"),
+        TimeZone.getTimeZone("America/Los_Angeles"),
+        TimeZone.getTimeZone("America/Phoenix"),
+        TimeZone.getTimeZone("America/Anchorage"),
+        TimeZone.getTimeZone("Pacific/Honolulu"),
+        TimeZone.getTimeZone("Europe/London"),
+        TimeZone.getTimeZone("Europe/Paris"),
+        TimeZone.getTimeZone("Europe/Berlin"),
+        TimeZone.getTimeZone("Europe/Rome"),
+        TimeZone.getTimeZone("Europe/Madrid"),
+        TimeZone.getTimeZone("Asia/Tokyo"),
+        TimeZone.getTimeZone("Asia/Shanghai"),
+        TimeZone.getTimeZone("Asia/Seoul"),
+        TimeZone.getTimeZone("Asia/Mumbai"),
+        TimeZone.getTimeZone("Australia/Sydney"),
+        TimeZone.getTimeZone("Australia/Melbourne"),
+        TimeZone.getTimeZone("UTC")
+    ).plus(TimeZone.getDefault()) // Add device timezone
+        .distinctBy { it.id } // Remove duplicates
+        .sortedBy { it.getDisplayName(false, TimeZone.SHORT) }
 
     companion object {
         private const val ARG_EVENT_ID = "event_id"
@@ -59,10 +84,11 @@ class AndroidEventDetailFragment : DialogFragment() {
         viewModel = ViewModelProvider(requireActivity())[CalendarViewModel::class.java]
 
         setupUI()
-        loadCalendars()
-        loadEvent()
+        setupTimezoneDropdown()
         setupClickListeners()
-        updateTimeDisplay()
+
+        // Load calendars FIRST, then load event in the callback
+        loadCalendarsAndEvent()
     }
 
     private fun setupUI() {
@@ -73,11 +99,53 @@ class AndroidEventDetailFragment : DialogFragment() {
         )
     }
 
-    private fun loadCalendars() {
+    private fun setupTimezoneDropdown() {
+        val timezoneNames = availableTimeZones.map { timezone ->
+            val shortName = timezone.getDisplayName(false, TimeZone.SHORT)
+            val longName = timezone.getDisplayName(false, TimeZone.LONG)
+            if (shortName == longName) {
+                shortName
+            } else {
+                "$shortName - $longName"
+            }
+        }
+
+        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, timezoneNames)
+        binding.spinnerTimezone.setAdapter(adapter)
+
+        // Set default to device timezone
+        selectedTimeZone = TimeZone.getDefault()
+        val defaultIndex = availableTimeZones.indexOfFirst { it.id == selectedTimeZone.id }
+        if (defaultIndex >= 0) {
+            binding.spinnerTimezone.setText(timezoneNames[defaultIndex], false)
+        }
+
+        binding.spinnerTimezone.setOnItemClickListener { _, _, position, _ ->
+            selectedTimeZone = availableTimeZones[position]
+            updateTimeDisplay()
+        }
+    }
+
+    private fun loadCalendarsAndEvent() {
         lifecycleScope.launch {
             try {
+                // Load calendars first
                 availableCalendars = viewModel.getAvailableCalendars()
+
+                println("=== Available Calendars for Selection ===")
+                availableCalendars.forEachIndexed { index, calendar ->
+                    println("Calendar $index:")
+                    println("  ID: '${calendar.id}'")
+                    println("  Name: '${calendar.name}'")
+                    println("  DisplayName: '${calendar.displayName}'")
+                }
+
                 setupCalendarDropdown()
+
+                // THEN load and match the event
+                loadEvent()
+                updateTimeDisplay()
+
             } catch (e: Exception) {
                 println("Error loading calendars: ${e.message}")
                 Toast.makeText(context, "Error loading calendars: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -115,15 +183,49 @@ class AndroidEventDetailFragment : DialogFragment() {
                 selectedEndDateTime = event.endTime
                 isAllDay = event.isAllDay
 
+                // Set timezone from event
+                try {
+                    selectedTimeZone = TimeZone.getTimeZone(event.timeZone)
+                    val timezoneIndex = availableTimeZones.indexOfFirst { it.id == event.timeZone }
+                    if (timezoneIndex >= 0) {
+                        val timezoneNames = availableTimeZones.map { timezone ->
+                            val shortName = timezone.getDisplayName(false, TimeZone.SHORT)
+                            val longName = timezone.getDisplayName(false, TimeZone.LONG)
+                            if (shortName == longName) shortName else "$shortName - $longName"
+                        }
+                        binding.spinnerTimezone.setText(timezoneNames[timezoneIndex], false)
+                    }
+                } catch (e: Exception) {
+                    selectedTimeZone = TimeZone.getDefault()
+                }
+
                 binding.switchAllDay.isChecked = isAllDay
                 binding.textDialogTitle.text = "Edit Event"
                 binding.buttonDelete.visibility = View.VISIBLE
 
-                // Set the calendar dropdown to the event's calendar
-                val eventCalendar = availableCalendars.find { it.id == event.calendarId }
+                // NOW calendar matching will work because calendars are loaded
+                println("=== DEBUG: Event Calendar Matching ===")
+                println("Event calendarId: '${event.calendarId}'")
+                println("Event calendarName: '${event.calendarName}'")
+                println("Available calendars count: ${availableCalendars.size}")
+
+                val eventCalendar = availableCalendars.find { calendar ->
+                    val displayNameMatch = calendar.displayName == event.calendarName
+                    println("Testing '${calendar.displayName}' == '${event.calendarName}': $displayNameMatch")
+                    displayNameMatch
+                }
+
                 if (eventCalendar != null) {
                     selectedCalendar = eventCalendar
                     binding.spinnerCalendar.setText(eventCalendar.displayName, false)
+                    println("✅ Successfully matched calendar: '${eventCalendar.displayName}'")
+                } else {
+                    println("❌ No exact match found")
+                    if (availableCalendars.isNotEmpty()) {
+                        selectedCalendar = availableCalendars.first()
+                        binding.spinnerCalendar.setText(selectedCalendar?.displayName ?: "", false)
+                        println("Using first available: '${selectedCalendar?.displayName}'")
+                    }
                 }
             }
         } else {
@@ -136,8 +238,6 @@ class AndroidEventDetailFragment : DialogFragment() {
             selectedStartDateTime = now.withMinute(0).withSecond(0).withNano(0).plusHours(1)
             selectedEndDateTime = selectedStartDateTime.plusHours(1)
         }
-
-        updateTimeDisplay()
     }
 
     private fun setupClickListeners() {
@@ -180,13 +280,24 @@ class AndroidEventDetailFragment : DialogFragment() {
     }
 
     private fun updateTimeDisplay() {
+        // Get timezone abbreviation
+        val timezoneInfo = selectedTimeZone.getDisplayName(false, TimeZone.SHORT)
+
         // Update start date/time
         binding.textStartDate.text = selectedStartDateTime.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
-        binding.textStartTime.text = if (isAllDay) "All day" else selectedStartDateTime.format(DateTimeFormatter.ofPattern("h:mm a"))
+        binding.textStartTime.text = if (isAllDay) {
+            "All day"
+        } else {
+            "${selectedStartDateTime.format(DateTimeFormatter.ofPattern("h:mm a"))} $timezoneInfo"
+        }
 
         // Update end date/time
         binding.textEndDate.text = selectedEndDateTime.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
-        binding.textEndTime.text = if (isAllDay) "All day" else selectedEndDateTime.format(DateTimeFormatter.ofPattern("h:mm a"))
+        binding.textEndTime.text = if (isAllDay) {
+            "All day"
+        } else {
+            "${selectedEndDateTime.format(DateTimeFormatter.ofPattern("h:mm a"))} $timezoneInfo"
+        }
 
         // Show/hide time layouts
         binding.layoutStartTime.visibility = if (isAllDay) View.GONE else View.VISIBLE
@@ -271,7 +382,8 @@ class AndroidEventDetailFragment : DialogFragment() {
             location = binding.editTextLocation.text.toString().trim(),
             calendarId = selectedCalendar!!.id,
             calendarName = selectedCalendar!!.displayName,
-            calendarColor = selectedCalendar!!.color
+            calendarColor = selectedCalendar!!.color,
+            timeZone = selectedTimeZone.id
         )
 
         if (editingEvent != null) {

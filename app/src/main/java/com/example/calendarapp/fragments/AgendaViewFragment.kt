@@ -55,10 +55,8 @@ class AgendaViewFragment : Fragment() {
     }
 
     fun scrollToToday() {
-        // Use the adapter's method to find today's exact position
         _binding?.let { binding ->
             binding.recyclerViewAgenda.post {
-                // Check if binding is still valid
                 if (_binding == null) return@post
 
                 val todayPosition = agendaAdapter.findTodayPosition()
@@ -66,36 +64,20 @@ class AgendaViewFragment : Fragment() {
 
                 val layoutManager = binding.recyclerViewAgenda.layoutManager as LinearLayoutManager
 
-                // Use a more aggressive approach to ensure today is at the top
-                // First, scroll immediately to position
-                layoutManager.scrollToPosition(todayPosition)
-
-                // Then post another action to fine-tune with offset
-                binding.recyclerViewAgenda.post {
-                    // Check if binding is still valid before the delayed action
-                    if (_binding == null) return@post
-
-                    // Add a small delay to let the first scroll complete
-                    binding.recyclerViewAgenda.postDelayed({
-                        // Final check before scrolling
-                        if (_binding != null) {
-                            layoutManager.scrollToPositionWithOffset(todayPosition, 0)
-                        }
-                    }, 50)
-                }
+                // Use scrollToPositionWithOffset to place today at the top
+                layoutManager.scrollToPositionWithOffset(todayPosition, 0)
             }
         }
     }
 
     private fun scrollToTodayOnLoad() {
-        // Same as scrollToToday but for initial load
         _binding?.let { binding ->
             binding.recyclerViewAgenda.post {
-                // Check if binding is still valid
                 if (_binding == null) return@post
 
                 val todayPosition = agendaAdapter.findTodayPosition()
-                binding.recyclerViewAgenda.smoothScrollToPosition(todayPosition)
+                // Use regular scrollToPosition for initial load to avoid jarring movement
+                binding.recyclerViewAgenda.scrollToPosition(todayPosition)
             }
         }
     }

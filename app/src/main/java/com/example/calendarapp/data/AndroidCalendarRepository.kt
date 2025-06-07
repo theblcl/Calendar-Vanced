@@ -118,6 +118,24 @@ class AndroidCalendarRepository(private val context: Context) {
     suspend fun getCalendars(): List<CalendarInfo> = withContext(Dispatchers.IO) {
         val calendars = mutableListOf<CalendarInfo>()
 
+        // Define a diverse color palette
+        val colorPalette = listOf(
+            "#E53E3E", // Red
+            "#3182CE", // Blue
+            "#38A169", // Green
+            "#D69E2E", // Orange
+            "#805AD5", // Purple
+            "#E53E3E", // Pink
+            "#319795", // Teal
+            "#DD6B20", // Orange-red
+            "#9F7AEA", // Light purple
+            "#4FD1C7", // Aqua
+            "#F56565", // Light red
+            "#4299E1", // Light blue
+            "#68D391", // Light green
+            "#ED8936"  // Amber
+        )
+
         val projection = arrayOf(
             CalendarContract.Calendars._ID,
             CalendarContract.Calendars.NAME,
@@ -125,9 +143,9 @@ class AndroidCalendarRepository(private val context: Context) {
             CalendarContract.Calendars.CALENDAR_COLOR,
             CalendarContract.Calendars.VISIBLE,
             CalendarContract.Calendars.SYNC_EVENTS,
-            CalendarContract.Calendars.ACCOUNT_NAME,      // Add account name
-            CalendarContract.Calendars.ACCOUNT_TYPE,      // Add account type
-            CalendarContract.Calendars.OWNER_ACCOUNT      // Add owner account
+            CalendarContract.Calendars.ACCOUNT_NAME,
+            CalendarContract.Calendars.ACCOUNT_TYPE,
+            CalendarContract.Calendars.OWNER_ACCOUNT
         )
 
         val selection = "${CalendarContract.Calendars.VISIBLE} = 1"
@@ -139,32 +157,36 @@ class AndroidCalendarRepository(private val context: Context) {
             null,
             CalendarContract.Calendars.CALENDAR_DISPLAY_NAME
         )?.use { cursor ->
+            var colorIndex = 0
             while (cursor.moveToNext()) {
                 val androidId = cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Calendars._ID))
                 val name = cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Calendars.NAME))
                 val displayName = cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Calendars.CALENDAR_DISPLAY_NAME))
-                val color = cursor.getInt(cursor.getColumnIndexOrThrow(CalendarContract.Calendars.CALENDAR_COLOR))
+                val originalColor = cursor.getInt(cursor.getColumnIndexOrThrow(CalendarContract.Calendars.CALENDAR_COLOR))
                 val visible = cursor.getInt(cursor.getColumnIndexOrThrow(CalendarContract.Calendars.VISIBLE)) == 1
                 val syncEvents = cursor.getInt(cursor.getColumnIndexOrThrow(CalendarContract.Calendars.SYNC_EVENTS)) == 1
 
-                // Get account information
                 val accountName = cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Calendars.ACCOUNT_NAME)) ?: ""
                 val accountType = cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Calendars.ACCOUNT_TYPE)) ?: ""
                 val ownerAccount = cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Calendars.OWNER_ACCOUNT)) ?: ""
 
+                // Use our diverse color palette instead of Android's colors
+                val assignedColor = colorPalette[colorIndex % colorPalette.size]
+                colorIndex++
+
                 calendars.add(
                     CalendarInfo(
-                        id = displayName ?: "Unknown Calendar", // Use display name as ID
+                        id = displayName ?: "Unknown Calendar",
                         name = name ?: "",
                         displayName = displayName ?: "Unknown Calendar",
-                        color = String.format("#%06X", 0xFFFFFF and color),
-                        url = accountName, // Store account name in url field for now
+                        color = assignedColor, // This color will be used in BOTH navigation and event cards
+                        url = accountName,
                         isEnabled = visible && syncEvents,
-                        description = "$accountType|$ownerAccount|$androidId" // Store additional info in description
+                        description = "$accountType|$ownerAccount|$androidId"
                     )
                 )
 
-                println("Found calendar: AndroidID=$androidId, DisplayName='$displayName', AccountName='$accountName', AccountType='$accountType', OwnerAccount='$ownerAccount'")
+                println("✅ Calendar '${displayName}' assigned color: $assignedColor (will be used in both navigation and event cards)")
             }
         }
 

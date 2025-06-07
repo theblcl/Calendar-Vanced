@@ -18,8 +18,8 @@
         android:textSize="16sp"
         android:textColor="#FFFFFF"
         android:textStyle="normal"
-        android:fontFamily="sans-serif"
         android:gravity="start"
+        android:fontFamily="@font/roboto_slab_bold"
         android:letterSpacing="0.02" />
 
 </LinearLayout>

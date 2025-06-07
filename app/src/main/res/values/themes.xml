@@ -5,6 +5,11 @@
     <style name="Theme.CalendarApp" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/blue_500</item>
         <item name="colorSecondary">@color/orange_500</item>
+
+        <!-- Custom card background for better contrast -->
+        <item name="colorSurface">#FAFAFA</item>
+        <item name="colorOnSurface">#1C1B1F</item>
+        <item name="colorSurfaceVariant">#F3F3F3</item>
     </style>
 
     <!-- E-paper theme - high contrast, always light -->

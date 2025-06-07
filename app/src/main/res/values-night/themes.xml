@@ -5,6 +5,11 @@
     <style name="Theme.CalendarApp" parent="Theme.Material3.Dark.NoActionBar">
         <item name="colorPrimary">@color/blue_500</item>
         <item name="colorSecondary">@color/orange_500</item>
+
+        <!-- Custom card background - dark gray instead of pure black -->
+        <item name="colorSurface">#2B2B2B</item>
+        <item name="colorOnSurface">#E6E1E5</item>
+        <item name="colorSurfaceVariant">#323232</item>
     </style>
 
 </resources>

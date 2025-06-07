@@ -1,4 +1,4 @@
-// Updated AgendaAdapter.kt - Generate dates starting from today instead of 6 months back
+// Updated AgendaAdapter.kt - Combines date headers with their events
 package com.example.calendarapp.adapters
 
 import android.view.LayoutInflater
@@ -7,23 +7,22 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import androidx.recyclerview.widget.RecyclerView
 import com.example.calendarapp.data.CalendarEvent
-import com.example.calendarapp.databinding.ItemAgendaDateHeaderBinding
-import com.example.calendarapp.databinding.ItemAgendaEventBinding
 import com.example.calendarapp.databinding.ItemAgendaMonthHeaderBinding
 import com.example.calendarapp.databinding.ItemAgendaWeekHeaderBinding
+import com.example.calendarapp.databinding.ItemAgendaDayWithEventsBinding
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.temporal.WeekFields
 import java.util.*
+import androidx.core.content.res.ResourcesCompat
 
 class AgendaAdapter(private val onEventClick: (CalendarEvent) -> Unit) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
         private const val TYPE_MONTH_HEADER = 0
         private const val TYPE_WEEK_HEADER = 1
-        private const val TYPE_DATE_HEADER = 2
-        private const val TYPE_EVENT = 3
+        private const val TYPE_DAY_WITH_EVENTS = 2
     }
 
     private var items = listOf<AgendaItem>()
@@ -31,16 +30,14 @@ class AgendaAdapter(private val onEventClick: (CalendarEvent) -> Unit) : Recycle
     sealed class AgendaItem {
         data class MonthHeader(val yearMonth: YearMonth) : AgendaItem()
         data class WeekHeader(val weekStart: LocalDate, val weekEnd: LocalDate) : AgendaItem()
-        data class DateHeader(val date: LocalDate) : AgendaItem()
-        data class Event(val event: CalendarEvent) : AgendaItem()
+        data class DayWithEvents(val date: LocalDate, val events: List<CalendarEvent>) : AgendaItem()
     }
 
     override fun getItemViewType(position: Int): Int {
         return when (items[position]) {
             is AgendaItem.MonthHeader -> TYPE_MONTH_HEADER
             is AgendaItem.WeekHeader -> TYPE_WEEK_HEADER
-            is AgendaItem.DateHeader -> TYPE_DATE_HEADER
-            is AgendaItem.Event -> TYPE_EVENT
+            is AgendaItem.DayWithEvents -> TYPE_DAY_WITH_EVENTS
         }
     }
 
@@ -54,13 +51,9 @@ class AgendaAdapter(private val onEventClick: (CalendarEvent) -> Unit) : Recycle
                 val binding = ItemAgendaWeekHeaderBinding.inflate(LayoutInflater.from(parent.context), parent, false)
                 WeekHeaderViewHolder(binding)
             }
-            TYPE_DATE_HEADER -> {
-                val binding = ItemAgendaDateHeaderBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-                DateHeaderViewHolder(binding)
-            }
-            TYPE_EVENT -> {
-                val binding = ItemAgendaEventBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-                EventViewHolder(binding, onEventClick)
+            TYPE_DAY_WITH_EVENTS -> {
+                val binding = ItemAgendaDayWithEventsBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+                DayWithEventsViewHolder(binding, onEventClick)
             }
             else -> throw IllegalArgumentException("Invalid view type")
         }
@@ -70,8 +63,7 @@ class AgendaAdapter(private val onEventClick: (CalendarEvent) -> Unit) : Recycle
         when (val item = items[position]) {
             is AgendaItem.MonthHeader -> (holder as MonthHeaderViewHolder).bind(item.yearMonth)
             is AgendaItem.WeekHeader -> (holder as WeekHeaderViewHolder).bind(item.weekStart, item.weekEnd)
-            is AgendaItem.DateHeader -> (holder as DateHeaderViewHolder).bind(item.date)
-            is AgendaItem.Event -> (holder as EventViewHolder).bind(item.event)
+            is AgendaItem.DayWithEvents -> (holder as DayWithEventsViewHolder).bind(item.date, item.events)
         }
     }
 
@@ -87,95 +79,35 @@ class AgendaAdapter(private val onEventClick: (CalendarEvent) -> Unit) : Recycle
         println("=== Generated agenda items ===")
         println("Today is: $today")
         println("Total items: ${items.size}")
-
-        // Find the first and last month headers
-        val monthHeaders = items.filterIsInstance<AgendaItem.MonthHeader>()
-        if (monthHeaders.isNotEmpty()) {
-            println("First month: ${monthHeaders.first().yearMonth}")
-            println("Last month: ${monthHeaders.last().yearMonth}")
-        }
-
-        // Check if today's week is present
-        val todayPosition = findTodayPosition()
-        println("Today found at position: $todayPosition")
-        if (todayPosition < items.size) {
-            println("Item at today's position: ${items[todayPosition]}")
-        }
     }
 
     // Function to find today's position in the list
     fun findTodayPosition(): Int {
         val today = LocalDate.now()
-        val todayYearMonth = YearMonth.from(today)
-        println("Looking for today: $today in month: $todayYearMonth")
+        println("Looking for today: $today")
 
-        var todayMonthStart = -1
-        var todayWeekPosition = -1
-        var todayDatePosition = -1
-
-        // First pass: find today's month
+        // Look for today's DayWithEvents item
         for (i in items.indices) {
             val item = items[i]
-            if (item is AgendaItem.MonthHeader && item.yearMonth == todayYearMonth) {
-                todayMonthStart = i
-                println("Found today's month header at position $i: ${item.yearMonth}")
-                break
+            if (item is AgendaItem.DayWithEvents && item.date == today) {
+                println("Found today's date at position $i: ${item.date}")
+                return i
             }
         }
 
-        if (todayMonthStart == -1) {
-            println("Today's month not found, returning 0")
-            return 0
-        }
-
-        // Second pass: look for today's week and date within this month
-        for (i in (todayMonthStart + 1) until items.size) {
+        // Fallback: look for today's week
+        for (i in items.indices) {
             val item = items[i]
-
-            when (item) {
-                is AgendaItem.MonthHeader -> {
-                    // Hit the next month, stop looking
-                    break
-                }
-                is AgendaItem.WeekHeader -> {
-                    if (!today.isBefore(item.weekStart) && !today.isAfter(item.weekEnd)) {
-                        todayWeekPosition = i
-                        println("Found today's week at position $i: ${item.weekStart} to ${item.weekEnd}")
-                    }
-                }
-                is AgendaItem.DateHeader -> {
-                    if (item.date == today) {
-                        todayDatePosition = i
-                        println("Found today's exact date at position $i: ${item.date}")
-                        break // Found exact date, stop looking
-                    }
-                }
-                is AgendaItem.Event -> {
-                    // Skip events
-                    continue
+            if (item is AgendaItem.WeekHeader) {
+                if (!today.isBefore(item.weekStart) && !today.isAfter(item.weekEnd)) {
+                    println("Found today's week at position $i")
+                    return i
                 }
             }
         }
 
-        // Return the best position we found
-        val finalPosition = when {
-            todayDatePosition != -1 -> {
-                // Instead of returning the date position, return the week position for more predictable scrolling
-                println("Found today's date, but returning week position for better scrolling")
-                if (todayWeekPosition != -1) todayWeekPosition else todayDatePosition
-            }
-            todayWeekPosition != -1 -> {
-                println("Returning today's week position: $todayWeekPosition")
-                todayWeekPosition
-            }
-            else -> {
-                println("Fallback to month start: $todayMonthStart")
-                todayMonthStart
-            }
-        }
-
-        println("Final position chosen: $finalPosition")
-        return finalPosition
+        println("Today not found, returning position 0")
+        return 0
     }
 
     private fun generateAgendaItems(events: List<CalendarEvent>): List<AgendaItem> {
@@ -232,7 +164,7 @@ class AgendaAdapter(private val onEventClick: (CalendarEvent) -> Unit) : Recycle
                 val weekStart = weekRange.first
                 val weekEnd = weekRange.second
 
-                // Always add week header (whether it has events or not)
+                // Always add week header
                 items.add(AgendaItem.WeekHeader(weekStart, weekEnd))
 
                 // Get all dates in this week that have events
@@ -242,14 +174,10 @@ class AgendaAdapter(private val onEventClick: (CalendarEvent) -> Unit) : Recycle
                     }
                     .sorted()
 
-                // Add date headers and events for this week (only if there are events)
+                // Add DayWithEvents items for each date with events
                 for (date in weekDatesWithEvents) {
-                    items.add(AgendaItem.DateHeader(date))
-
-                    // Add all events for this date
-                    eventsByDate[date]?.forEach { event ->
-                        items.add(AgendaItem.Event(event))
-                    }
+                    val dayEvents = eventsByDate[date] ?: emptyList()
+                    items.add(AgendaItem.DayWithEvents(date, dayEvents))
                 }
             }
 
@@ -303,105 +231,150 @@ class AgendaAdapter(private val onEventClick: (CalendarEvent) -> Unit) : Recycle
         }
     }
 
-    class DateHeaderViewHolder(private val binding: ItemAgendaDateHeaderBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(date: LocalDate) {
-            // Only set the compact date display (day of week and number)
-            binding.textDayNumber.text = date.dayOfMonth.toString()
+    class DayWithEventsViewHolder(private val binding: ItemAgendaDayWithEventsBinding, private val onEventClick: (CalendarEvent) -> Unit) : RecyclerView.ViewHolder(binding.root) {
+
+        fun bind(date: LocalDate, events: List<CalendarEvent>) {
+            // Set the date display
             binding.textDayOfWeek.text = date.format(DateTimeFormatter.ofPattern("EEE")).uppercase()
+            binding.textDayNumber.text = date.dayOfMonth.toString()
 
-            // Removed the binding.textDate.text assignment since we removed that TextView
-            // This prevents the crash when the layout doesn't have textDate anymore
-        }
-    }
+            // Set orange colors
+            binding.textDayOfWeek.setTextColor(android.graphics.Color.parseColor("#FF9800"))
+            binding.textDayNumber.setTextColor(android.graphics.Color.parseColor("#FF9800"))
 
-    class EventViewHolder(private val binding: ItemAgendaEventBinding, private val onEventClick: (CalendarEvent) -> Unit) : RecyclerView.ViewHolder(binding.root) {
-        private var currentEvent: CalendarEvent? = null
+            // Clear previous events
+            binding.eventsContainer.removeAllViews()
 
-        init {
-            // Set click listeners for both card and line layouts
-            binding.eventCard.setOnClickListener {
-                currentEvent?.let { onEventClick(it) }
-            }
-            binding.eventLine.setOnClickListener {
-                currentEvent?.let { onEventClick(it) }
+            // Add each event to the container
+            events.forEach { event ->
+                val eventView = createEventView(event)
+                binding.eventsContainer.addView(eventView)
             }
         }
 
-        fun bind(event: CalendarEvent) {
-            currentEvent = event
-            // Calculate event duration in hours
-            val durationHours = java.time.Duration.between(event.startTime, event.endTime).toHours()
+        private fun createEventView(event: CalendarEvent): View {
+            val context = binding.root.context
 
-            if (event.isAllDay) {
-                // Show as line item for all-day events
-                binding.eventCard.visibility = View.GONE
-                binding.eventLine.visibility = View.VISIBLE
-
-                binding.textEventTitleLine.text = event.title
-
-                if (event.description.isNotEmpty()) {
-                    binding.textEventDescriptionLine.text = event.description
-                    binding.textEventDescriptionLine.visibility = View.VISIBLE
-                } else {
-                    binding.textEventDescriptionLine.visibility = View.GONE
+            // Create a container for the event
+            val eventContainer = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = 16 // More spacing between events
                 }
-
-                // Set calendar color indicator for line item
-                try {
-                    binding.colorIndicatorLine.setBackgroundColor(android.graphics.Color.parseColor(event.calendarColor))
-                } catch (e: Exception) {
-                    binding.colorIndicatorLine.setBackgroundColor(android.graphics.Color.parseColor("#4285F4"))
-                }
-
-            } else {
-                // Show as card for timed events
-                binding.eventCard.visibility = View.VISIBLE
-                binding.eventLine.visibility = View.GONE
-
-                binding.textEventTitle.text = event.title
-
-                // Format time display
-                val startTime = event.startTime.format(DateTimeFormatter.ofPattern("h:mm a"))
-                val endTime = event.endTime.format(DateTimeFormatter.ofPattern("h:mm a"))
-                binding.textEventTime.text = "$startTime - $endTime"
-
-                // Format duration display
-                binding.textEventDuration.text = when {
-                    durationHours < 1 -> "${java.time.Duration.between(event.startTime, event.endTime).toMinutes()}m"
-                    durationHours == 1L -> "1h"
-                    else -> "${durationHours}h"
-                }
-
-                if (event.description.isNotEmpty()) {
-                    binding.textEventDescription.text = event.description
-                    binding.textEventDescription.visibility = View.VISIBLE
-                } else {
-                    binding.textEventDescription.visibility = View.GONE
-                }
-
-                // Set calendar color indicator for card
-                try {
-                    binding.colorIndicator.setBackgroundColor(android.graphics.Color.parseColor(event.calendarColor))
-                } catch (e: Exception) {
-                    binding.colorIndicator.setBackgroundColor(android.graphics.Color.parseColor("#4285F4"))
-                }
-
-                // Scale card height based on duration (max 8 hours)
-                val scaledDuration = kotlin.math.min(durationHours, 8L)
-                val baseHeight = 120 // Increased base minimum height in dp to show full time range
-                val additionalHeight = (scaledDuration * 20).toInt() // 20dp per hour, more generous spacing
-                val totalHeightDp = baseHeight + additionalHeight
-
-                // Convert dp to pixels
-                val density = binding.root.context.resources.displayMetrics.density
-                val totalHeightPx = (totalHeightDp * density).toInt()
-
-                // Apply the height to the card's content container
-                val cardContent = binding.eventCard.getChildAt(0) as LinearLayout
-                val layoutParams = cardContent.layoutParams
-                layoutParams.height = totalHeightPx
-                cardContent.layoutParams = layoutParams
             }
+
+            // Create a CardView with enhanced material design
+            val cardView = androidx.cardview.widget.CardView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+
+                // Enhanced material design properties
+                radius = 16f // Larger radius for modern look
+                cardElevation = 4f // More elevation for depth
+
+                // Theme-appropriate background colors
+                val isDarkMode = (context.resources.configuration.uiMode and
+                        android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                        android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+                setCardBackgroundColor(
+                    if (isDarkMode) {
+                        android.graphics.Color.parseColor("#2B2B2B") // Dark gray for dark mode
+                    } else {
+                        android.graphics.Color.parseColor("#FFFFFF") // Pure white for light mode
+                    }
+                )
+
+                // Enhanced material ripple effect
+                isClickable = true
+                isFocusable = true
+            }
+
+            // Create a horizontal container for colored line + content
+            val cardContent = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+
+            // Create enhanced colored line indicator with proper drawable
+            val colorIndicator = android.view.View(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    8, // Slightly wider for better visibility
+                    LinearLayout.LayoutParams.MATCH_PARENT
+                ).apply {
+                    marginEnd = 18 // More space between line and text
+                }
+
+                // Use the event's calendar color
+                val calendarColor = try {
+                    android.graphics.Color.parseColor(event.calendarColor)
+                } catch (e: Exception) {
+                    android.graphics.Color.parseColor("#3182CE") // Default blue from our palette
+                }
+
+                // Create a rounded rectangle drawable programmatically
+                val drawable = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(calendarColor)
+                    cornerRadius = 4f // Rounded corners
+                    shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                }
+
+                background = drawable
+
+                println("Event '${event.title}' using accent color: ${event.calendarColor}")
+            }
+
+            // Create the event text with enhanced styling
+            val eventText = android.widget.TextView(context).apply {
+                text = "${event.title}\n${event.startTime.format(DateTimeFormatter.ofPattern("h:mm a"))} - ${event.endTime.format(DateTimeFormatter.ofPattern("h:mm a"))}"
+                textSize = 15f // Slightly larger text
+                setPadding(0, 24, 24, 24) // More generous padding
+
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+
+                // Text color based on theme
+                val isDarkMode = (context.resources.configuration.uiMode and
+                        android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                        android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+                setTextColor(
+                    if (isDarkMode) {
+                        android.graphics.Color.parseColor("#E6E1E5") // Light text for dark mode
+                    } else {
+                        android.graphics.Color.parseColor("#1C1B1F") // Dark text for light mode
+                    }
+                )
+
+                // Enhanced line spacing for better readability
+                setLineSpacing(10f, 1.3f)
+
+                // Add subtle shadow for depth (light mode only)
+                if (!isDarkMode) {
+                    setShadowLayer(1f, 0f, 1f, android.graphics.Color.parseColor("#10000000"))
+                }
+
+                setOnClickListener { onEventClick(event) }
+            }
+
+            // Assemble the card
+            cardContent.addView(colorIndicator)
+            cardContent.addView(eventText)
+            cardView.addView(cardContent)
+            eventContainer.addView(cardView)
+
+            return eventContainer
         }
     }
 }
