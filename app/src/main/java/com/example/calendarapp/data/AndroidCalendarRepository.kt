@@ -54,6 +54,12 @@ class AndroidCalendarRepository(private val context: Context) {
             }
         }
 
+        println("=== AndroidCalendarRepository: getEvents() ===")
+        println("Total events retrieved: ${events.size}")
+        events.forEach { event ->
+            println("Event: '${event.title}' -> Calendar: '${event.calendarName}' (Color: ${event.calendarColor})")
+        }
+
         events
     }
 
@@ -65,15 +71,41 @@ class AndroidCalendarRepository(private val context: Context) {
         println("Event: ${event.title}")
         println("Target Calendar Name: '${event.calendarName}'")
         println("Found Android Calendar ID: $androidCalendarId")
+        println("Event timezone: ${event.timeZone}")
+        println("Start time (local): ${event.startTime}")
+        println("End time (local): ${event.endTime}")
+
+        // Convert the event time from the selected timezone to UTC milliseconds
+        val eventTimeZone = try {
+            java.util.TimeZone.getTimeZone(event.timeZone)
+        } catch (e: Exception) {
+            println("Invalid timezone '${event.timeZone}', using system default")
+            java.util.TimeZone.getDefault()
+        }
+
+        // Create ZoneId from the event's timezone
+        val eventZoneId = eventTimeZone.toZoneId()
+
+        // Convert LocalDateTime to ZonedDateTime in the event's timezone, then to UTC
+        val startZoned = event.startTime.atZone(eventZoneId)
+        val endZoned = event.endTime.atZone(eventZoneId)
+
+        val startUtcMillis = startZoned.toInstant().toEpochMilli()
+        val endUtcMillis = endZoned.toInstant().toEpochMilli()
+
+        println("Start time (in ${event.timeZone}): $startZoned")
+        println("End time (in ${event.timeZone}): $endZoned")
+        println("Start UTC millis: $startUtcMillis")
+        println("End UTC millis: $endUtcMillis")
 
         val values = ContentValues().apply {
-            put(CalendarContract.Events.DTSTART, event.startTime.toEpochSecond(ZoneOffset.UTC) * 1000)
-            put(CalendarContract.Events.DTEND, event.endTime.toEpochSecond(ZoneOffset.UTC) * 1000)
+            put(CalendarContract.Events.DTSTART, startUtcMillis)
+            put(CalendarContract.Events.DTEND, endUtcMillis)
             put(CalendarContract.Events.TITLE, event.title)
             put(CalendarContract.Events.DESCRIPTION, event.description)
             put(CalendarContract.Events.EVENT_LOCATION, event.location)
             put(CalendarContract.Events.CALENDAR_ID, androidCalendarId)
-            put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
+            put(CalendarContract.Events.EVENT_TIMEZONE, event.timeZone) // Store the actual timezone
             put(CalendarContract.Events.ALL_DAY, if (event.isAllDay) 1 else 0)
         }
 
@@ -90,14 +122,37 @@ class AndroidCalendarRepository(private val context: Context) {
         println("Event ID: ${event.id}")
         println("Target Calendar Name: '${event.calendarName}'")
         println("Found Android Calendar ID: $androidCalendarId")
+        println("Event timezone: ${event.timeZone}")
+
+        // Convert the event time from the selected timezone to UTC milliseconds
+        val eventTimeZone = try {
+            java.util.TimeZone.getTimeZone(event.timeZone)
+        } catch (e: Exception) {
+            println("Invalid timezone '${event.timeZone}', using system default")
+            java.util.TimeZone.getDefault()
+        }
+
+        // Create ZoneId from the event's timezone
+        val eventZoneId = eventTimeZone.toZoneId()
+
+        // Convert LocalDateTime to ZonedDateTime in the event's timezone, then to UTC
+        val startZoned = event.startTime.atZone(eventZoneId)
+        val endZoned = event.endTime.atZone(eventZoneId)
+
+        val startUtcMillis = startZoned.toInstant().toEpochMilli()
+        val endUtcMillis = endZoned.toInstant().toEpochMilli()
+
+        println("Start time (in ${event.timeZone}): $startZoned")
+        println("End time (in ${event.timeZone}): $endZoned")
 
         val values = ContentValues().apply {
-            put(CalendarContract.Events.DTSTART, event.startTime.toEpochSecond(ZoneOffset.UTC) * 1000)
-            put(CalendarContract.Events.DTEND, event.endTime.toEpochSecond(ZoneOffset.UTC) * 1000)
+            put(CalendarContract.Events.DTSTART, startUtcMillis)
+            put(CalendarContract.Events.DTEND, endUtcMillis)
             put(CalendarContract.Events.TITLE, event.title)
             put(CalendarContract.Events.DESCRIPTION, event.description)
             put(CalendarContract.Events.EVENT_LOCATION, event.location)
             put(CalendarContract.Events.CALENDAR_ID, androidCalendarId)
+            put(CalendarContract.Events.EVENT_TIMEZONE, event.timeZone) // Store the actual timezone
             put(CalendarContract.Events.ALL_DAY, if (event.isAllDay) 1 else 0)
         }
 
@@ -118,7 +173,7 @@ class AndroidCalendarRepository(private val context: Context) {
     suspend fun getCalendars(): List<CalendarInfo> = withContext(Dispatchers.IO) {
         val calendars = mutableListOf<CalendarInfo>()
 
-        // Define a diverse color palette
+        // Define a diverse color palette - SAME as in getAssignedCalendarColor
         val colorPalette = listOf(
             "#E53E3E", // Red
             "#3182CE", // Blue
@@ -157,7 +212,6 @@ class AndroidCalendarRepository(private val context: Context) {
             null,
             CalendarContract.Calendars.CALENDAR_DISPLAY_NAME
         )?.use { cursor ->
-            var colorIndex = 0
             while (cursor.moveToNext()) {
                 val androidId = cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Calendars._ID))
                 val name = cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Calendars.NAME))
@@ -170,9 +224,8 @@ class AndroidCalendarRepository(private val context: Context) {
                 val accountType = cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Calendars.ACCOUNT_TYPE)) ?: ""
                 val ownerAccount = cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Calendars.OWNER_ACCOUNT)) ?: ""
 
-                // Use our diverse color palette instead of Android's colors
-                val assignedColor = colorPalette[colorIndex % colorPalette.size]
-                colorIndex++
+                // CRITICAL: Use the SAME color assignment method for consistency
+                val assignedColor = getAssignedCalendarColor(displayName ?: "Unknown Calendar")
 
                 calendars.add(
                     CalendarInfo(
@@ -186,8 +239,14 @@ class AndroidCalendarRepository(private val context: Context) {
                     )
                 )
 
-                println("✅ Calendar '${displayName}' assigned color: $assignedColor (will be used in both navigation and event cards)")
+                println("✅ Calendar '${displayName}' assigned color: $assignedColor (consistent color for nav + events)")
             }
+        }
+
+        println("=== AndroidCalendarRepository: getCalendars() ===")
+        println("Total calendars retrieved: ${calendars.size}")
+        calendars.forEach { calendar ->
+            println("Calendar: '${calendar.displayName}' (ID: '${calendar.id}', Color: ${calendar.color})")
         }
 
         calendars
@@ -212,8 +271,52 @@ class AndroidCalendarRepository(private val context: Context) {
         val calendarDisplayName = cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Events.CALENDAR_DISPLAY_NAME)) ?: ""
         val calendarColor = cursor.getInt(cursor.getColumnIndexOrThrow(CalendarContract.Events.CALENDAR_COLOR))
 
-        val startTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(startMillis), ZoneId.systemDefault())
-        val endTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(endMillis), ZoneId.systemDefault())
+        // Get the event's timezone - important for proper display
+        val eventTimeZone = try {
+            // Try to get the timezone from the event data
+            val projection = arrayOf(CalendarContract.Events.EVENT_TIMEZONE)
+            val selection = "${CalendarContract.Events._ID} = ?"
+            val selectionArgs = arrayOf(id)
+
+            contentResolver.query(
+                CalendarContract.Events.CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                null
+            )?.use { tzCursor ->
+                if (tzCursor.moveToFirst()) {
+                    val tz = tzCursor.getString(tzCursor.getColumnIndexOrThrow(CalendarContract.Events.EVENT_TIMEZONE))
+                    if (!tz.isNullOrEmpty()) tz else TimeZone.getDefault().id
+                } else {
+                    TimeZone.getDefault().id
+                }
+            } ?: TimeZone.getDefault().id
+        } catch (e: Exception) {
+            println("Error getting event timezone: ${e.message}")
+            TimeZone.getDefault().id
+        }
+
+        println("Event '$title': stored timezone = '$eventTimeZone'")
+
+        // Convert UTC milliseconds back to LocalDateTime
+        // The stored times are in UTC, but we need to display them in the event's timezone
+        val eventZoneId = try {
+            java.util.TimeZone.getTimeZone(eventTimeZone).toZoneId()
+        } catch (e: Exception) {
+            ZoneId.systemDefault()
+        }
+
+        val startInstant = Instant.ofEpochMilli(startMillis)
+        val endInstant = Instant.ofEpochMilli(endMillis)
+
+        val startTime = LocalDateTime.ofInstant(startInstant, eventZoneId)
+        val endTime = LocalDateTime.ofInstant(endInstant, eventZoneId)
+
+        println("Event '$title': UTC start = $startInstant, local start in $eventTimeZone = $startTime")
+
+        // CRITICAL: Get the assigned color for this calendar from our palette
+        val assignedCalendarColor = getAssignedCalendarColor(calendarDisplayName)
 
         return CalendarEvent(
             id = id,
@@ -225,8 +328,38 @@ class AndroidCalendarRepository(private val context: Context) {
             location = location,
             calendarId = calendarDisplayName, // Use display name as calendar ID
             calendarName = calendarDisplayName,
-            calendarColor = String.format("#%06X", 0xFFFFFF and calendarColor)
+            calendarColor = assignedCalendarColor, // Use our assigned color instead of Android's
+            timeZone = eventTimeZone // Store the actual timezone
         )
+    }
+
+    private fun getAssignedCalendarColor(calendarDisplayName: String): String {
+        // Use the same color assignment logic as in getCalendars()
+        // CRITICAL: This ensures nav menu colors and event card colors match
+        val colorPalette = listOf(
+            "#E53E3E", // Red
+            "#3182CE", // Blue
+            "#38A169", // Green
+            "#D69E2E", // Orange
+            "#805AD5", // Purple
+            "#E53E3E", // Pink
+            "#319795", // Teal
+            "#DD6B20", // Orange-red
+            "#9F7AEA", // Light purple
+            "#4FD1C7", // Aqua
+            "#F56565", // Light red
+            "#4299E1", // Light blue
+            "#68D391", // Light green
+            "#ED8936"  // Amber
+        )
+
+        // Simple hash-based color assignment to ensure consistency
+        val hash = calendarDisplayName.hashCode()
+        val colorIndex = kotlin.math.abs(hash) % colorPalette.size
+        val assignedColor = colorPalette[colorIndex]
+
+        println("Color assignment for '$calendarDisplayName': hash=$hash, index=$colorIndex, color=$assignedColor")
+        return assignedColor
     }
 
     private fun findCalendarIdByName(calendarName: String): String {

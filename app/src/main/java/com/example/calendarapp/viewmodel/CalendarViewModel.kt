@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 class CalendarViewModel(private val context: Context) : ViewModel() {
-    private val repository = AndroidCalendarRepository(context)  // Changed to Android-only
+    private val repository = AndroidCalendarRepository(context)
 
     private val _events = MutableLiveData<List<CalendarEvent>>()
     val events: LiveData<List<CalendarEvent>> = _events
@@ -30,11 +30,50 @@ class CalendarViewModel(private val context: Context) : ViewModel() {
     private val _syncStatus = MutableLiveData<String>()
     val syncStatus: LiveData<String> = _syncStatus
 
+    private var isInitialized = false
+
     init {
         _selectedDate.value = LocalDate.now()
+        // Start with empty set initially - this is important
         _visibleCalendars.value = emptySet()
+
+        // Load data in the correct order
         loadCalendars()
         loadEvents()
+    }
+
+    fun loadCalendars() {
+        viewModelScope.launch {
+            try {
+                val calendars = repository.getCalendars()
+                _availableCalendars.value = calendars
+
+                // IMPORTANT: Only set all calendars visible on first load
+                if (!isInitialized) {
+                    val allCalendarNames = calendars.map { it.displayName }.toSet()
+                    _visibleCalendars.value = allCalendarNames
+                    isInitialized = true
+
+                    println("=== Initial Calendar Load ===")
+                    println("Loaded ${calendars.size} calendars, all initially visible")
+                    allCalendarNames.forEach { name ->
+                        println("  ✅ '$name' - visible")
+                    }
+
+                    // Apply the filter after setting visible calendars
+                    filterEvents()
+                } else {
+                    // On subsequent loads, preserve existing visibility state
+                    println("=== Subsequent Calendar Load - Preserving Visibility State ===")
+                    val currentVisible = _visibleCalendars.value ?: emptySet()
+                    println("Current visible calendars: $currentVisible")
+                    filterEvents()
+                }
+
+            } catch (e: Exception) {
+                println("Error loading calendars: ${e.message}")
+            }
+        }
     }
 
     fun selectDate(date: LocalDate) {
@@ -46,63 +85,86 @@ class CalendarViewModel(private val context: Context) : ViewModel() {
             try {
                 val eventList = repository.getEvents()
                 _allEvents.value = eventList
+
+                println("=== Events Loaded ===")
+                println("Total events loaded: ${eventList.size}")
+
+                // Debug: Print each event and its calendar association
+                eventList.forEach { event ->
+                    println("Event: '${event.title}' -> Calendar: '${event.calendarName}' (ID: '${event.calendarId}')")
+                }
+
                 filterEvents() // Apply calendar visibility filter
                 _syncStatus.value = "Events loaded from Android Calendar"
             } catch (e: Exception) {
                 _syncStatus.value = "Error loading events: ${e.message}"
-            }
-        }
-    }
-
-    fun loadCalendars() {
-        viewModelScope.launch {
-            try {
-                val calendars = repository.getCalendars()
-                _availableCalendars.value = calendars
-
-                // Initially show all calendars
-                val allCalendarNames = calendars.map { it.displayName }.toSet()
-                _visibleCalendars.value = allCalendarNames
-                filterEvents()
-            } catch (e: Exception) {
-                println("Error loading calendars: ${e.message}")
+                println("Error loading events: ${e.message}")
             }
         }
     }
 
     fun toggleCalendarVisibility(calendarName: String) {
         val currentVisible = _visibleCalendars.value ?: emptySet()
-        val newVisible = if (currentVisible.contains(calendarName)) {
+        val wasVisible = currentVisible.contains(calendarName)
+        val newVisible = if (wasVisible) {
             currentVisible - calendarName
         } else {
             currentVisible + calendarName
         }
-        _visibleCalendars.value = newVisible
-        filterEvents()
 
-        println("Calendar '$calendarName' visibility toggled. Visible calendars: $newVisible")
+        println("=== Toggling Calendar Visibility ===")
+        println("Calendar: '$calendarName'")
+        println("Was visible: $wasVisible")
+        println("Now visible: ${newVisible.contains(calendarName)}")
+        println("Before: $currentVisible")
+        println("After: $newVisible")
+
+        // Update the visibility state - this will trigger observers
+        _visibleCalendars.value = newVisible
+
+        // Force immediate filtering
+        filterEvents()
     }
 
     fun isCalendarVisible(calendarName: String): Boolean {
-        return _visibleCalendars.value?.contains(calendarName) ?: false
+        val visible = _visibleCalendars.value?.contains(calendarName) ?: false
+        return visible
     }
 
     private fun filterEvents() {
         val allEvents = _allEvents.value ?: emptyList()
         val visibleCalendarNames = _visibleCalendars.value ?: emptySet()
 
+        println("=== Event Filtering ===")
+        println("Total events: ${allEvents.size}")
+        println("Visible calendars: $visibleCalendarNames")
+
+        // Debug: Show all unique calendar names in events
+        val eventCalendarNames = allEvents.map { it.calendarName }.distinct()
+        println("Calendar names found in events: $eventCalendarNames")
+
         val filteredEvents = if (visibleCalendarNames.isEmpty()) {
-            // If no calendars are selected, show all events
+            // If no calendars are selected, show all events (fallback behavior)
+            println("No calendars selected - showing all events")
             allEvents
         } else {
             // Only show events from visible calendars
-            allEvents.filter { event ->
-                visibleCalendarNames.contains(event.calendarName)
+            val filtered = allEvents.filter { event ->
+                val isVisible = visibleCalendarNames.contains(event.calendarName)
+                if (!isVisible) {
+                    println("  ❌ Hiding event '${event.title}' from calendar '${event.calendarName}'")
+                } else {
+                    println("  ✅ Showing event '${event.title}' from calendar '${event.calendarName}'")
+                }
+                isVisible
             }
+            filtered
         }
 
+        println("Filtered events: ${filteredEvents.size} out of ${allEvents.size}")
+
+        // Update the events LiveData - this should trigger UI updates
         _events.value = filteredEvents
-        println("Filtered events: ${filteredEvents.size} out of ${allEvents.size} total events")
     }
 
     fun syncCalendar() {

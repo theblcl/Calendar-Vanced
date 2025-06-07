@@ -5,15 +5,14 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Very thick black border and fill -->
+    <!-- Dark blue background circle -->
     <path
-        android:fillColor="#000000"
-        android:pathData="M20,2H4C2.9,2 2,2.9 2,4v16c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V4C22,2.9 21.1,2 20,2z"/>
+        android:fillColor="#1976D2"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2z"/>
 
-    <!-- Large white checkmark - very bold -->
+    <!-- Large white checkmark -->
     <path
         android:fillColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:pathData="M9,16.17L5.53,12.7L4.12,14.11L9,19L20.88,7.12L19.47,5.71L9,16.17z"/>
+        android:pathData="M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z"/>
 
 </vector>

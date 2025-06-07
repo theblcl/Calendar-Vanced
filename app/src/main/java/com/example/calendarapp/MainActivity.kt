@@ -1,4 +1,3 @@
-// Complete cleaned MainActivity.kt
 package com.example.calendarapp
 
 import android.Manifest
@@ -44,7 +43,11 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     }
 
     private var lastCalendarSetupTime = 0L
-    private var lastCalendarCount = 0
+    private var calendarsLoaded = false
+    private var isSettingUpCalendars = false // Prevent concurrent setup
+
+    // Track calendar menu items separately
+    private val calendarMenuItems = mutableMapOf<String, MenuItem>()
 
     private fun setupViewNavigation() {
         val menu = binding.navView.menu
@@ -54,9 +57,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         // Clear any existing items first
         menu.clear()
 
-        // Add view options (radio button behavior - only one selected)
+        // Add view options in a separate group that allows single selection
         val viewGroup = menu.addSubMenu(0, VIEW_GROUP_ID, 0, "Views").also { submenu ->
-            submenu.setGroupCheckable(0, true, true) // Single selection
+            submenu.setGroupCheckable(0, true, true) // Single selection for views only
         }
 
         // Add all view options
@@ -86,13 +89,13 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             isCheckable = true
         }
 
-        // Add actions
-        menu.add(0, NAV_SYNC_ID, 10, "Sync").apply {
+        // Add actions in a separate non-checkable group
+        menu.add(Menu.NONE, NAV_SYNC_ID, 10, "Sync").apply {
             setIcon(android.R.drawable.ic_popup_sync)
             isCheckable = false
         }
 
-        menu.add(0, NAV_SETTINGS_ID, 11, "Settings").apply {
+        menu.add(Menu.NONE, NAV_SETTINGS_ID, 11, "Settings").apply {
             setIcon(android.R.drawable.ic_menu_preferences)
             isCheckable = false
         }
@@ -125,6 +128,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             NAV_SYNC_ID -> {
                 viewModel.syncCalendar()
                 Toast.makeText(this, "Syncing calendar...", Toast.LENGTH_SHORT).show()
+                return true // Don't close drawer
             }
             NAV_SETTINGS_ID -> {
                 showFragment(SettingsFragment())
@@ -132,37 +136,41 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             }
             else -> {
                 // Handle calendar visibility toggles
-                val calendarIndex = item.itemId - CALENDAR_MENU_ID_OFFSET
-                if (calendarIndex >= 0) {
-                    val calendars = viewModel.availableCalendars.value
-                    if (calendars != null && calendarIndex < calendars.size) {
-                        val calendar = calendars[calendarIndex]
+                val calendarName = calendarMenuItems.entries.find { it.value == item }?.key
+                if (calendarName != null) {
+                    println("=== Calendar Toggle Debug ===")
+                    println("Tapped menu item with ID: ${item.itemId}")
+                    println("Mapped to calendar: '$calendarName'")
+                    println("Current visibility: ${viewModel.isCalendarVisible(calendarName)}")
 
-                        // Toggle the calendar visibility
-                        viewModel.toggleCalendarVisibility(calendar.displayName)
+                    // Toggle the calendar visibility in ViewModel
+                    viewModel.toggleCalendarVisibility(calendarName)
 
-                        // Update the menu item check state and icon
-                        item.isChecked = viewModel.isCalendarVisible(calendar.displayName)
-
-                        // Update icon
-                        if (item.isChecked) {
-                            item.setIcon(R.drawable.checkbox_checked_epaper)
-                        } else {
-                            item.setIcon(R.drawable.checkbox_unchecked_epaper)
-                        }
-
-                        println("Toggled calendar: ${calendar.displayName} -> visible: ${item.isChecked}")
-
-                        // Don't close drawer for calendar toggles
-                        return true
-                    }
+                    // Return true to keep drawer open for calendar toggles
+                    return true
+                } else {
+                    println("Could not find calendar for menu item ID: ${item.itemId}")
+                    return true
                 }
             }
         }
 
-        // Close drawer for view changes
+        // Close drawer for view changes only
         binding.drawerLayout.closeDrawer(GravityCompat.START)
         return true
+    }
+
+    private fun updateCalendarCheckbox(calendarName: String, isVisible: Boolean) {
+        val menuItem = calendarMenuItems[calendarName]
+        if (menuItem != null) {
+            // Update the checkbox icon only
+            if (isVisible) {
+                menuItem.setIcon(R.drawable.checkbox_checked_epaper)
+            } else {
+                menuItem.setIcon(R.drawable.checkbox_unchecked_epaper)
+            }
+            println("Updated checkbox for '$calendarName': $isVisible")
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -306,137 +314,191 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     }
 
     private fun observeCalendars() {
+        // Observe calendar visibility changes to update checkboxes
+        viewModel.visibleCalendars.observe(this) { visibleCalendars ->
+            if (calendarsLoaded) {
+                println("=== Visibility changed, updating checkboxes ===")
+                println("Visible calendars: $visibleCalendars")
+                updateAllCalendarCheckboxes(visibleCalendars)
+            }
+        }
+
+        // Observe available calendars to set up the menu
         viewModel.availableCalendars.observe(this) { calendars ->
             setupCalendarCheckboxes(calendars)
+            calendarsLoaded = true
+        }
+
+        // Observe events to see when they change
+        viewModel.events.observe(this) { events ->
+            println("=== Events updated: ${events.size} events visible ===")
         }
     }
 
-    private fun setupCalendarCheckboxes(calendars: List<com.example.calendarapp.data.CalendarInfo>) {
-        val currentTime = System.currentTimeMillis()
+    private fun updateAllCalendarCheckboxes(visibleCalendars: Set<String>) {
+        println("=== updateAllCalendarCheckboxes called ===")
+        println("Visible calendars: $visibleCalendars")
+        println("Calendar menu items count: ${calendarMenuItems.size}")
 
-        if (currentTime - lastCalendarSetupTime < 1000 && calendars.size == lastCalendarCount) {
-            println("=== SKIPPING: setupCalendarCheckboxes called too soon (${currentTime - lastCalendarSetupTime}ms ago)")
+        calendarMenuItems.forEach { (calendarName, menuItem) ->
+            val isVisible = visibleCalendars.contains(calendarName)
+
+            // Use modern, friendly system icons
+            if (isVisible) {
+                menuItem.setIcon(android.R.drawable.ic_menu_send) // Calendar/agenda icon for enabled
+                println("✅ Set AGENDA ICON for '$calendarName'")
+            } else {
+                menuItem.setIcon(android.R.drawable.ic_menu_close_clear_cancel) // X icon for disabled
+                println("❌ Set X ICON for '$calendarName'")
+            }
+        }
+
+        // Force the navigation view to refresh
+        binding.navView.invalidate()
+    }
+
+    private fun setupCalendarCheckboxes(calendars: List<com.example.calendarapp.data.CalendarInfo>) {
+        // Prevent concurrent setup calls
+        if (isSettingUpCalendars) {
+            println("=== SKIPPING: Calendar setup already in progress")
             return
         }
 
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastCalendarSetupTime < 500) { // Reduced from 1000ms to 500ms
+            println("=== SKIPPING: setupCalendarCheckboxes called too soon")
+            return
+        }
+
+        isSettingUpCalendars = true
         lastCalendarSetupTime = currentTime
-        lastCalendarCount = calendars.size
 
         val menu = binding.navView.menu
 
         println("=== DEBUG: Setting up calendar checkboxes ===")
-        println("Method called with ${calendars.size} calendars at time $currentTime")
+        println("Method called with ${calendars.size} calendars")
 
-        // Remove any existing calendar items
-        var removedCount = 0
-        for (i in menu.size() - 1 downTo 0) {
+        // Clear existing calendar items and map MORE THOROUGHLY
+        calendarMenuItems.clear()
+
+        // Remove all items that are not core navigation items
+        val itemsToRemove = mutableListOf<MenuItem>()
+        for (i in 0 until menu.size()) {
             val item = menu.getItem(i)
-            if (item.itemId >= CALENDAR_MENU_ID_OFFSET || item.itemId == 999) {
-                println("Removing existing item: ${item.title} (ID: ${item.itemId})")
-                menu.removeItem(item.itemId)
-                removedCount++
+            val itemId = item.itemId
+
+            // Keep only core navigation items (Views, Sync, Settings)
+            if (itemId != VIEW_GROUP_ID &&
+                itemId != NAV_AGENDA_ID && itemId != NAV_DAY_ID &&
+                itemId != NAV_THREE_DAY_ID && itemId != NAV_WEEK_ID &&
+                itemId != NAV_MONTH_ID && itemId != NAV_SYNC_ID &&
+                itemId != NAV_SETTINGS_ID) {
+                itemsToRemove.add(item)
             }
         }
-        println("Removed $removedCount existing calendar items")
+
+        itemsToRemove.forEach { item ->
+            menu.removeItem(item.itemId)
+            println("Removed menu item: '${item.title}' (ID: ${item.itemId})")
+        }
 
         if (calendars.isEmpty()) {
             println("No calendars to add")
+            isSettingUpCalendars = false
             return
         }
 
+        // Group calendars by source
         val groupedCalendars = calendars.groupBy { calendar ->
             extractCalendarSource(calendar)
         }
 
-        println("=== FINAL GROUPING ===")
-        groupedCalendars.forEach { (source, cals) ->
-            println("Group '$source': ${cals.size} calendars")
-            cals.forEach { cal ->
-                println("  - ${cal.displayName} (color: ${cal.color})")
-            }
-        }
-
-        var itemIndex = 0
         var orderIndex = 50
+        var headerIdCounter = 9000 // Use high numbers for headers to avoid conflicts
 
         groupedCalendars.forEach { (source, calendarGroup) ->
-            // Add group header
-            val headerId = 999 - itemIndex
-            val headerItem = menu.add(0, headerId, orderIndex++, "── $source ──")
-            headerItem.isEnabled = false
-            println("Added group header: '$source' (ID: $headerId)")
+            // Add group header (not clickable) with unique ID
+            val headerId = headerIdCounter++
+            menu.add(Menu.NONE, headerId, orderIndex++, "── $source ──").apply {
+                isEnabled = false
+                isCheckable = false
+                println("Added header: '── $source ──' with ID: $headerId")
+            }
 
-            // Add calendars in this group with colored text
-            // Add calendars in this group with colored text matching event accent bars
+            // Add calendars in this group
             calendarGroup.forEach { calendar ->
+                // Use a unique ID based on calendar name hash to avoid conflicts
+                val menuItemId = CALENDAR_MENU_ID_OFFSET + Math.abs(calendar.displayName.hashCode())
                 val menuItem = menu.add(
-                    Menu.NONE,
-                    CALENDAR_MENU_ID_OFFSET + itemIndex,
+                    Menu.NONE, // NO GROUP - This prevents the highlighting issue
+                    menuItemId,
                     orderIndex++,
                     "  ${calendar.displayName}"
                 )
 
                 menuItem.apply {
-                    isCheckable = true
-                    isChecked = viewModel.isCalendarVisible(calendar.displayName)
+                    // CRITICAL: Do not make calendar items checkable in the traditional sense
+                    // We'll handle the visual state manually with icons
+                    isCheckable = false
 
-                    // Create colored text span using THE EXACT SAME COLOR as event accent bars
+                    // Check current visibility from ViewModel
+                    val isVisible = viewModel.isCalendarVisible(calendar.displayName)
+
+                    // Use modern, friendly system icons
+                    if (isVisible) {
+                        setIcon(android.R.drawable.ic_menu_agenda) // Calendar/agenda icon for enabled
+                        println("Set AGENDA ICON for '${calendar.displayName}'")
+                    } else {
+                        setIcon(android.R.drawable.ic_menu_close_clear_cancel) // X icon for disabled
+                        println("Set X ICON for '${calendar.displayName}'")
+                    }
+
+                    println("Calendar '${calendar.displayName}': visible=$isVisible, menuItemId=$menuItemId")
+
+                    // Apply calendar color to text
                     val spannable = android.text.SpannableString("  ${calendar.displayName}")
                     try {
-                        // This MUST be the same color that appears in event.calendarColor
                         val color = android.graphics.Color.parseColor(calendar.color)
                         val colorSpan = android.text.style.ForegroundColorSpan(color)
                         spannable.setSpan(colorSpan, 0, spannable.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                         title = spannable
-
-                        println("Navigation menu: '${calendar.displayName}' using color: ${calendar.color}")
                     } catch (e: Exception) {
-                        println("❌ Failed to parse color '${calendar.color}' for calendar '${calendar.displayName}'")
                         title = "  ${calendar.displayName}"
-                    }
-
-                    if (isChecked) {
-                        setIcon(R.drawable.checkbox_checked_epaper)
-                    } else {
-                        setIcon(R.drawable.checkbox_unchecked_epaper)
                     }
                 }
 
-                itemIndex++
+                // Store in our map for easy updates - KEY IS CALENDAR NAME
+                calendarMenuItems[calendar.displayName] = menuItem
+                println("Added calendar: '${calendar.displayName}' -> Menu ID: $menuItemId")
             }
         }
 
-        println("Calendar setup complete: $itemIndex calendars in ${groupedCalendars.size} groups")
+        println("Calendar setup complete: ${calendarMenuItems.size} calendars")
+        println("Final calendar menu mapping:")
+        calendarMenuItems.forEach { (name, item) ->
+            println("  '$name' -> Menu ID: ${item.itemId}")
+        }
+
+        isSettingUpCalendars = false
     }
 
     private fun extractCalendarSource(calendar: com.example.calendarapp.data.CalendarInfo): String {
-        println("=== DEBUG: Extracting source from account info ===")
-        println("Calendar: '${calendar.displayName}'")
-        println("Account name (stored in url): '${calendar.url}'")
-        println("Description (accountType|ownerAccount|androidId): '${calendar.description}'")
-
         val accountName = calendar.url  // We stored account name in url field
         val descriptionParts = calendar.description.split("|")
         val accountType = if (descriptionParts.size > 0) descriptionParts[0] else ""
         val ownerAccount = if (descriptionParts.size > 1) descriptionParts[1] else ""
 
-        println("Parsed - accountName: '$accountName', accountType: '$accountType', ownerAccount: '$ownerAccount'")
-
-        val result = when {
+        return when {
             // Use account name if available and meaningful
             accountName.isNotEmpty() && accountName != "null" -> {
                 when {
                     // If it's an email, use the part before @ but normalize it
                     accountName.contains("@") -> {
-                        val emailPrefix = accountName.substringBefore("@").lowercase()
-                        println("Using normalized email prefix: '$emailPrefix'")
-                        emailPrefix.replaceFirstChar { it.titlecase() }
+                        accountName.substringBefore("@").lowercase().replaceFirstChar { it.titlecase() }
                     }
                     // If it's already a clean name, normalize it
                     else -> {
-                        val normalized = accountName.lowercase()
-                        println("Using normalized account name: '$normalized'")
-                        normalized.replaceFirstChar { it.titlecase() }
+                        accountName.lowercase().replaceFirstChar { it.titlecase() }
                     }
                 }
             }
@@ -448,31 +510,22 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                 } else {
                     ownerAccount.lowercase()
                 }
-                println("Using normalized owner account: '$result'")
                 result.replaceFirstChar { it.titlecase() }
             }
 
             // Use account type as fallback with normalization
             accountType.isNotEmpty() && accountType != "null" -> {
-                val cleanType = when (accountType.lowercase()) {
+                when (accountType.lowercase()) {
                     "com.google" -> "Google"
                     "com.google.android.gm.exchange" -> "Exchange"
                     "local" -> "Local"
                     else -> accountType.substringAfterLast(".").lowercase().replaceFirstChar { it.titlecase() }
                 }
-                println("Using normalized account type: '$cleanType'")
-                cleanType
             }
 
             // Final fallback
-            else -> {
-                println("Using default fallback")
-                "Device Calendars"
-            }
+            else -> "Device Calendars"
         }
-
-        println("Final result: '$result'")
-        return result
     }
 
     private fun showFragment(fragment: Fragment) {
@@ -484,15 +537,6 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     fun showEventDetail(eventId: String? = null) {
         val dialog = AndroidEventDetailFragment.newInstance(eventId)
         dialog.show(supportFragmentManager, "AndroidEventDetailFragment")
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            binding.drawerLayout.closeDrawer(GravityCompat.START)
-        } else {
-            super.onBackPressed()
-        }
     }
 
     override fun onResume() {
