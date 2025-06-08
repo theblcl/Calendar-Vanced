@@ -446,7 +446,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
                     // Use modern, friendly system icons
                     if (isVisible) {
-                        setIcon(android.R.drawable.ic_menu_agenda) // Calendar/agenda icon for enabled
+                        setIcon(android.R.drawable.ic_menu_send) // Calendar/agenda icon for enabled
                         println("Set AGENDA ICON for '${calendar.displayName}'")
                     } else {
                         setIcon(android.R.drawable.ic_menu_close_clear_cancel) // X icon for disabled
