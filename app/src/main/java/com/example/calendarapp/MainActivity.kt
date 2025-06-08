@@ -166,9 +166,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         if (menuItem != null) {
             // Update the checkbox icon only
             if (isVisible) {
-                menuItem.setIcon(R.drawable.checkbox_checked_epaper)
+                menuItem.setIcon(android.R.drawable.ic_menu_send)
             } else {
-                menuItem.setIcon(R.drawable.checkbox_unchecked_epaper)
+                menuItem.setIcon(android.R.drawable.ic_delete)
             }
             println("Updated checkbox for '$calendarName': $isVisible")
         }
@@ -346,10 +346,10 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
             // Use system radio button icons
             if (isVisible) {
-                menuItem.setIcon(android.R.drawable.radiobutton_on_background) // Selected radio button
+                menuItem.setIcon(android.R.drawable.ic_menu_send) // Selected radio button
                 println("✅ Set RADIO SELECTED for '$calendarName'")
             } else {
-                menuItem.setIcon(android.R.drawable.radiobutton_off_background) // Unselected radio button
+                menuItem.setIcon(android.R.drawable.ic_delete) // Unselected radio button
                 println("⚪ Set RADIO UNSELECTED for '$calendarName'")
             }
         }
