@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Toast
@@ -343,13 +344,13 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         calendarMenuItems.forEach { (calendarName, menuItem) ->
             val isVisible = visibleCalendars.contains(calendarName)
 
-            // Use modern, friendly system icons
+            // Use system radio button icons
             if (isVisible) {
-                menuItem.setIcon(android.R.drawable.ic_menu_send) // Calendar/agenda icon for enabled
-                println("✅ Set AGENDA ICON for '$calendarName'")
+                menuItem.setIcon(android.R.drawable.radiobutton_on_background) // Selected radio button
+                println("✅ Set RADIO SELECTED for '$calendarName'")
             } else {
-                menuItem.setIcon(android.R.drawable.ic_menu_close_clear_cancel) // X icon for disabled
-                println("❌ Set X ICON for '$calendarName'")
+                menuItem.setIcon(android.R.drawable.radiobutton_off_background) // Unselected radio button
+                println("⚪ Set RADIO UNSELECTED for '$calendarName'")
             }
         }
 
@@ -444,13 +445,13 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                     // Check current visibility from ViewModel
                     val isVisible = viewModel.isCalendarVisible(calendar.displayName)
 
-                    // Use modern, friendly system icons
+                    // Use system radio button icons
                     if (isVisible) {
-                        setIcon(android.R.drawable.ic_menu_send) // Calendar/agenda icon for enabled
-                        println("Set AGENDA ICON for '${calendar.displayName}'")
+                        setIcon(android.R.drawable.radiobutton_on_background) // Selected radio button
+                        println("Set RADIO SELECTED for '${calendar.displayName}'")
                     } else {
-                        setIcon(android.R.drawable.ic_menu_close_clear_cancel) // X icon for disabled
-                        println("Set X ICON for '${calendar.displayName}'")
+                        setIcon(android.R.drawable.radiobutton_off_background) // Unselected radio button
+                        println("Set RADIO UNSELECTED for '${calendar.displayName}'")
                     }
 
                     println("Calendar '${calendar.displayName}': visible=$isVisible, menuItemId=$menuItemId")
@@ -537,6 +538,91 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     fun showEventDetail(eventId: String? = null) {
         val dialog = AndroidEventDetailFragment.newInstance(eventId)
         dialog.show(supportFragmentManager, "AndroidEventDetailFragment")
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        when (keyCode) {
+            // Navigation shortcuts (single letters)
+            KeyEvent.KEYCODE_A -> {
+                showFragment(AgendaViewFragment())
+                supportActionBar?.title = "Agenda"
+                Toast.makeText(this, "Agenda View", Toast.LENGTH_SHORT).show()
+                return true
+            }
+            KeyEvent.KEYCODE_D -> {
+                showFragment(DayViewFragment())
+                supportActionBar?.title = "Day"
+                Toast.makeText(this, "Day View", Toast.LENGTH_SHORT).show()
+                return true
+            }
+            KeyEvent.KEYCODE_W -> {
+                showFragment(WeekViewFragment())
+                supportActionBar?.title = "Week"
+                Toast.makeText(this, "Week View", Toast.LENGTH_SHORT).show()
+                return true
+            }
+            KeyEvent.KEYCODE_M -> {
+                showFragment(MonthViewFragment())
+                supportActionBar?.title = "Month"
+                Toast.makeText(this, "Month View", Toast.LENGTH_SHORT).show()
+                return true
+            }
+            KeyEvent.KEYCODE_T -> {
+                val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+                if (currentFragment is AgendaViewFragment) {
+                    currentFragment.scrollToToday() // T = Today
+                    Toast.makeText(this, "Today", Toast.LENGTH_SHORT).show()
+                    return true
+                }
+            }
+            KeyEvent.KEYCODE_N -> {
+                showEventDetail() // N = New event
+                Toast.makeText(this, "New Event", Toast.LENGTH_SHORT).show()
+                return true
+            }
+
+            // Page navigation for agenda view
+            KeyEvent.KEYCODE_PAGE_UP -> {
+                val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+                if (currentFragment is AgendaViewFragment) {
+                    // Access the page up method through fragment
+                    currentFragment.view?.findViewById<android.widget.Button>(R.id.button_page_up)?.performClick()
+                    return true
+                }
+            }
+            KeyEvent.KEYCODE_PAGE_DOWN -> {
+                val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+                if (currentFragment is AgendaViewFragment) {
+                    // Access the page down method through fragment
+                    currentFragment.view?.findViewById<android.widget.Button>(R.id.button_page_down)?.performClick()
+                    return true
+                }
+            }
+
+            // Quick actions
+            KeyEvent.KEYCODE_S -> {
+                if (event?.isCtrlPressed == true) {
+                    viewModel.syncCalendar() // Ctrl+S = Sync
+                    Toast.makeText(this, "Syncing calendar...", Toast.LENGTH_SHORT).show()
+                    return true
+                }
+            }
+            KeyEvent.KEYCODE_ESCAPE -> {
+                if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                    binding.drawerLayout.closeDrawer(GravityCompat.START)
+                    return true
+                }
+            }
+            KeyEvent.KEYCODE_MENU -> {
+                if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                    binding.drawerLayout.closeDrawer(GravityCompat.START)
+                } else {
+                    binding.drawerLayout.openDrawer(GravityCompat.START)
+                }
+                return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     override fun onResume() {

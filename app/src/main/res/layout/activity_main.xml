@@ -89,7 +89,10 @@
             android:layout_margin="16dp"
             android:src="@drawable/ic_add"
             android:contentDescription="Add event"
-            app:tint="@android:color/white" />
+            app:tint="@android:color/white"
+            app:backgroundTint="?attr/colorPrimary"
+            app:borderWidth="2dp"
+            app:elevation="8dp" />
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 

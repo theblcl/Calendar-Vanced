@@ -168,6 +168,7 @@ class AgendaAdapter(private val onEventClick: (CalendarEvent) -> Unit) : Recycle
                 items.add(AgendaItem.WeekHeader(weekStart, weekEnd))
 
                 // Get all dates in this week that have events
+                // Get all dates in this week that have events
                 val weekDatesWithEvents = eventsByDate.keys
                     .filter { date ->
                         !date.isBefore(weekStart) && !date.isAfter(weekEnd)
@@ -175,9 +176,16 @@ class AgendaAdapter(private val onEventClick: (CalendarEvent) -> Unit) : Recycle
                     .sorted()
 
                 // Add DayWithEvents items for each date with events
+                // BUT only if the date belongs to the current month (to avoid duplicates)
                 for (date in weekDatesWithEvents) {
-                    val dayEvents = eventsByDate[date] ?: emptyList()
-                    items.add(AgendaItem.DayWithEvents(date, dayEvents))
+                    // Only show events if the date is actually in the current month
+                    if (date.month == currentYearMonth.month && date.year == currentYearMonth.year) {
+                        val dayEvents = eventsByDate[date] ?: emptyList()
+                        items.add(AgendaItem.DayWithEvents(date, dayEvents))
+                        println("Added events for $date in month ${currentYearMonth.month} (${dayEvents.size} events)")
+                    } else {
+                        println("Skipped events for $date - belongs to different month (${date.month} vs ${currentYearMonth.month})")
+                    }
                 }
             }
 

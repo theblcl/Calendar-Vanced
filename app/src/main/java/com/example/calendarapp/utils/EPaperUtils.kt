@@ -25,6 +25,7 @@ object EPaperUtils {
             manufacturer.contains("onyx") -> true
             manufacturer.contains("remarkable") -> true
             model.contains("kindle") -> true
+            model.contains("mp01") -> true  // Your e-ink device
             else -> false
         }
     }

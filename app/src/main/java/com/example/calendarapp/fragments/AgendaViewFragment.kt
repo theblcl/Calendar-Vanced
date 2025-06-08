@@ -30,6 +30,8 @@ class AgendaViewFragment : Fragment() {
         viewModel = ViewModelProvider(requireActivity())[CalendarViewModel::class.java]
 
         setupRecyclerView()
+        setupPageNavigation()
+        updatePageNavigationVisibility()
         observeViewModel()
     }
 
@@ -42,6 +44,66 @@ class AgendaViewFragment : Fragment() {
             layoutManager = LinearLayoutManager(context)
             adapter = agendaAdapter
         }
+    }
+
+    private fun setupPageNavigation() {
+        binding.buttonPageUp.setOnClickListener {
+            pageUp()
+        }
+
+        binding.buttonPageDown.setOnClickListener {
+            pageDown()
+        }
+    }
+
+    private fun updatePageNavigationVisibility() {
+        // Only show page navigation buttons when e-ink mode is enabled
+        val isEPaperMode = com.example.calendarapp.utils.EPaperUtils.isEPaperMode(requireContext())
+
+        // Access the buttons directly since they're in our layout
+        if (isEPaperMode) {
+            binding.buttonPageUp.visibility = android.view.View.VISIBLE
+            binding.buttonPageDown.visibility = android.view.View.VISIBLE
+            // Also show the parent container
+            binding.buttonPageUp.parent?.let { parent ->
+                (parent as? android.view.View)?.visibility = android.view.View.VISIBLE
+            }
+            println("E-ink mode enabled - showing page navigation buttons")
+        } else {
+            binding.buttonPageUp.visibility = android.view.View.GONE
+            binding.buttonPageDown.visibility = android.view.View.GONE
+            // Also hide the parent container
+            binding.buttonPageUp.parent?.let { parent ->
+                (parent as? android.view.View)?.visibility = android.view.View.GONE
+            }
+            println("E-ink mode disabled - hiding page navigation buttons")
+        }
+    }
+
+    private fun pageUp() {
+        val recyclerView = binding.recyclerViewAgenda
+
+        // Calculate 75% of the visible area height
+        val visibleHeight = recyclerView.height - recyclerView.paddingTop - recyclerView.paddingBottom
+        val scrollDistance = (visibleHeight * 0.75).toInt()
+
+        // Jump scroll up by 75% of screen height (no animation for e-ink)
+        recyclerView.scrollBy(0, -scrollDistance)
+
+        println("Page Up: jumped up by ${scrollDistance}px (75% of ${visibleHeight}px)")
+    }
+
+    private fun pageDown() {
+        val recyclerView = binding.recyclerViewAgenda
+
+        // Calculate 75% of the visible area height
+        val visibleHeight = recyclerView.height - recyclerView.paddingTop - recyclerView.paddingBottom
+        val scrollDistance = (visibleHeight * 0.75).toInt()
+
+        // Jump scroll down by 75% of screen height (no animation for e-ink)
+        recyclerView.scrollBy(0, scrollDistance)
+
+        println("Page Down: jumped down by ${scrollDistance}px (75% of ${visibleHeight}px)")
     }
 
     private fun observeViewModel() {
